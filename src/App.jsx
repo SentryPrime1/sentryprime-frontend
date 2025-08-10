@@ -48,7 +48,7 @@ function App() {
         }
       }, 2000)
 
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.sentryprime.com'}/api/scan?url=${encodeURIComponent(url.trim())}&max_pages=${maxPages}`, {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://web-production-51f3.up.railway.app'}/api/scan?url=${encodeURIComponent(url.trim())}&max_pages=${maxPages}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
