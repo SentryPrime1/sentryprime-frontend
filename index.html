@@ -1,13 +1,761 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SentryPrime - Automated Website Accessibility Scanning</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-2">
+                    <svg class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                    <span class="text-2xl font-bold text-gray-900">SentryPrime</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Features</span>
+                    <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">Pricing</span>
+                    <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">Reviews</span>
+                    
+                    <!-- Authentication Buttons -->
+                    <div id="auth-buttons">
+                        <button onclick="openAuthModal('login')" class="border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50">
+                            Sign In
+                        </button>
+                        <button onclick="openAuthModal('register')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                            Get Started
+                        </button>
+                    </div>
+                    
+                    <!-- User Menu (hidden by default) -->
+                    <div id="user-menu" style="display: none;" class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            <div id="user-avatar" class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                                <span id="user-initial" class="text-white text-sm font-medium">U</span>
+                            </div>
+                            <span id="user-name" class="text-sm font-medium">User</span>
+                        </div>
+                        <button onclick="openDashboard()" class="border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50">
+                            Dashboard
+                        </button>
+                        <button onclick="handleLogout()" class="border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50">
+                            Sign Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto text-center">
+            <div class="mb-8">
+                <span class="bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm mb-4 inline-block">
+                    🚀 Enhanced Multi-Page Scanning Now Available
+                </span>
+            </div>
+            
+            <h1 class="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+                Stop Expensive Accessibility Lawsuits
+                <span class="text-blue-600">Before They Start</span>
+            </h1>
+            
+            <p class="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+                Comprehensive WCAG compliance scanning that protects your business from costly legal action. 
+                Get detailed reports and fix issues before they become $75,000+ lawsuits.
+            </p>
+            
+            <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+                <button onclick="scrollToScan()" class="bg-yellow-500 hover:bg-yellow-600 text-black px-6 py-3 rounded-md text-lg font-medium">
+                    🔍 Start Free Scan
+                </button>
+                <button class="border border-gray-300 text-gray-700 px-6 py-3 rounded-md text-lg font-medium hover:bg-gray-50">
+                    View Pricing
+                </button>
+            </div>
+            
+            <div class="flex justify-center items-center space-x-8 text-sm text-gray-500">
+                <div class="flex items-center">
+                    <svg class="h-5 w-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    WCAG 2.1 Compliant
+                </div>
+                <div class="flex items-center">
+                    <svg class="h-5 w-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                    SOC 2 Certified
+                </div>
+                <div class="flex items-center">
+                    <svg class="h-5 w-5 text-purple-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                    </svg>
+                    Trusted by 1000+ businesses
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Scanning Section -->
+    <section id="scan-section" class="py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white shadow-xl rounded-lg border-0">
+                <div class="text-center pb-8 pt-8">
+                    <div class="flex items-center justify-center mb-4">
+                        <svg class="h-8 w-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <h2 class="text-3xl font-bold">Enhanced Website Accessibility Scan</h2>
+                    </div>
+                    <p class="text-lg text-gray-600">
+                        Comprehensive multi-page accessibility analysis with detailed violation reporting
+                    </p>
+                </div>
+                
+                <div class="p-8 space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Website URL
+                            </label>
+                            <input
+                                type="url"
+                                id="website-url"
+                                placeholder="https://example.com"
+                                class="w-full text-lg py-3 px-4 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Max Pages to Scan
+                            </label>
+                            <select
+                                id="max-pages"
+                                class="w-full text-lg py-3 px-4 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="10">10 pages (Quick scan)</option>
+                                <option value="25">25 pages (Standard)</option>
+                                <option value="50" selected>50 pages (Comprehensive)</option>
+                                <option value="100">100 pages (Deep analysis)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="font-semibold text-lg mb-4 flex items-center">
+                            <svg class="h-5 w-5 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                            </svg>
+                            Enhanced Scanning Features
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div class="flex items-center">
+                                <svg class="h-4 w-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                                Multi-page crawling
+                            </div>
+                            <div class="flex items-center">
+                                <svg class="h-4 w-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                                Sitemap discovery
+                            </div>
+                            <div class="flex items-center">
+                                <svg class="h-4 w-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                                WCAG 2.1 compliance
+                            </div>
+                            <div class="flex items-center">
+                                <svg class="h-4 w-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                                Detailed violation reports
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error Message -->
+                    <div id="error-message" style="display: none;" class="bg-red-50 border border-red-200 rounded-md p-4">
+                        <div class="flex">
+                            <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div class="ml-3">
+                                <p id="error-text" class="text-sm text-red-800"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress -->
+                    <div id="scan-progress" style="display: none;" class="space-y-4">
+                        <div class="text-center">
+                            <p id="scan-status" class="text-sm text-gray-600 mb-2">Initializing scan...</p>
+                            <div class="w-full bg-gray-200 rounded-full h-3">
+                                <div id="progress-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        id="scan-button"
+                        onclick="startScan()"
+                        class="w-full text-lg py-6 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium"
+                    >
+                        🔍 Start Enhanced Scan
+                    </button>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 text-center text-sm text-gray-500">
+                        <div class="flex flex-col items-center">
+                            <svg class="h-8 w-8 text-green-500 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>No signup required</span>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <svg class="h-8 w-8 text-blue-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                            <span>Comprehensive analysis</span>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <svg class="h-8 w-8 text-purple-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                            </svg>
+                            <span>Detailed reports</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Scan Results -->
+    <section id="scan-results" style="display: none;" class="py-16 px-4 sm:px-6 lg:px-8 bg-white">
+        <div class="max-w-6xl mx-auto">
+            <div class="bg-white shadow-xl rounded-lg">
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-t-lg">
+                    <h2 id="results-title" class="text-2xl font-bold">Scan Results</h2>
+                    <p id="results-description" class="text-gray-600">Scan completed</p>
+                </div>
+                
+                <div id="results-content" class="p-8 space-y-8">
+                    <!-- Results will be populated here -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Authentication Modal -->
+    <div id="auth-modal" class="modal">
+        <div class="bg-white p-8 rounded-lg w-90 max-w-md mx-4 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">Welcome to SentryPrime</h2>
+                <button onclick="closeAuthModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            
+            <div class="mb-6">
+                <button id="login-tab" onclick="switchAuthTab('login')" class="px-4 py-2 mr-2 rounded-md">Sign In</button>
+                <button id="register-tab" onclick="switchAuthTab('register')" class="px-4 py-2 rounded-md">Sign Up</button>
+            </div>
+
+            <form id="auth-form" onsubmit="handleAuth(event)">
+                <div id="auth-fields">
+                    <!-- Fields will be populated by JavaScript -->
+                </div>
+                
+                <div id="auth-message" style="display: none;" class="mb-4 p-3 rounded-md"></div>
+                
+                <button type="submit" id="auth-submit" class="w-full py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium">
+                    Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="flex items-center justify-center space-x-2 mb-4">
+                <svg class="h-8 w-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                </svg>
+                <span class="text-2xl font-bold">SentryPrime</span>
+            </div>
+            <p class="text-gray-400 mb-4">
+                Protecting businesses from accessibility lawsuits since 2025
+            </p>
+            <div class="flex justify-center items-center space-x-8 text-sm">
+                <span>WCAG 2.1 Compliant</span>
+                <span>•</span>
+                <span>Trusted by 1000+ businesses</span>
+                <span>•</span>
+                <span>Made with ❤️ by Manus</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Global state
+        let currentUser = null;
+        let authToken = null;
+        let currentAuthMode = 'login';
+        let isScanning = false;
+
+        // Check for existing authentication on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('authToken');
+            const userData = localStorage.getItem('userData');
+            
+            if (token && userData) {
+                try {
+                    authToken = token;
+                    currentUser = JSON.parse(userData);
+                    updateUIForLoggedInUser();
+                } catch (error) {
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('userData');
+                }
+            }
+        });
+
+        // Authentication functions
+        function openAuthModal(mode = 'login') {
+            currentAuthMode = mode;
+            updateAuthModal();
+            document.getElementById('auth-modal').classList.add('show');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('auth-modal').classList.remove('show');
+        }
+
+        function switchAuthTab(mode) {
+            currentAuthMode = mode;
+            updateAuthModal();
+        }
+
+        function updateAuthModal() {
+            const loginTab = document.getElementById('login-tab');
+            const registerTab = document.getElementById('register-tab');
+            const authFields = document.getElementById('auth-fields');
+            const authSubmit = document.getElementById('auth-submit');
+
+            // Update tab styles
+            if (currentAuthMode === 'login') {
+                loginTab.className = 'px-4 py-2 mr-2 rounded-md bg-blue-600 text-white';
+                registerTab.className = 'px-4 py-2 rounded-md bg-gray-100 text-gray-700';
+                authSubmit.textContent = 'Sign In';
+            } else {
+                loginTab.className = 'px-4 py-2 mr-2 rounded-md bg-gray-100 text-gray-700';
+                registerTab.className = 'px-4 py-2 rounded-md bg-blue-600 text-white';
+                authSubmit.textContent = 'Create Account';
+            }
+
+            // Update form fields
+            if (currentAuthMode === 'register') {
+                authFields.innerHTML = `
+                    <div class="mb-4">
+                        <input type="text" id="firstName" placeholder="First Name" required class="w-full p-3 border border-gray-300 rounded-md mb-2">
+                        <input type="text" id="lastName" placeholder="Last Name" required class="w-full p-3 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="mb-4">
+                        <input type="email" id="email" placeholder="your@email.com" required class="w-full p-3 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="mb-4">
+                        <input type="password" id="password" placeholder="Password" required class="w-full p-3 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="mb-4">
+                        <input type="password" id="confirmPassword" placeholder="Confirm Password" required class="w-full p-3 border border-gray-300 rounded-md">
+                    </div>
+                `;
+            } else {
+                authFields.innerHTML = `
+                    <div class="mb-4">
+                        <input type="email" id="email" placeholder="your@email.com" required class="w-full p-3 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="mb-4">
+                        <input type="password" id="password" placeholder="Password" required class="w-full p-3 border border-gray-300 rounded-md">
+                    </div>
+                `;
+            }
+        }
+
+        async function handleAuth(event) {
+            event.preventDefault();
+            
+            const submitBtn = document.getElementById('auth-submit');
+            const messageDiv = document.getElementById('auth-message');
+            
+            submitBtn.innerHTML = `<div class="spinner"></div>${currentAuthMode === 'login' ? 'Signing In...' : 'Creating Account...'}`;
+            submitBtn.disabled = true;
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const backendUrl = 'https://web-production-51f3.up.railway.app';
+                
+                let requestData = { email, password };
+                
+                if (currentAuthMode === 'register') {
+                    const firstName = document.getElementById('firstName').value;
+                    const lastName = document.getElementById('lastName').value;
+                    const confirmPassword = document.getElementById('confirmPassword').value;
+                    
+                    if (password !== confirmPassword) {
+                        throw new Error('Passwords do not match');
+                    }
+                    
+                    requestData = { ...requestData, first_name: firstName, last_name: lastName };
+                }
+                
+                const response = await fetch(`${backendUrl}/api/auth/${currentAuthMode === 'login' ? 'login' : 'register'}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || `${currentAuthMode} failed`);
+                }
+                
+                // Store authentication data
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('userData', JSON.stringify(data.user));
+                
+                // Update global state
+                currentUser = data.user;
+                authToken = data.token;
+                
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'mb-4 p-3 rounded-md bg-green-50 text-green-800';
+                messageDiv.textContent = `${currentAuthMode === 'login' ? 'Login' : 'Registration'} successful!`;
+                
+                setTimeout(() => {
+                    closeAuthModal();
+                    updateUIForLoggedInUser();
+                }, 1000);
+                
+            } catch (err) {
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'mb-4 p-3 rounded-md bg-red-50 text-red-800';
+                messageDiv.textContent = err.message;
+                
+                submitBtn.textContent = currentAuthMode === 'login' ? 'Sign In' : 'Create Account';
+                submitBtn.disabled = false;
+            }
+        }
+
+        function updateUIForLoggedInUser() {
+            const authButtons = document.getElementById('auth-buttons');
+            const userMenu = document.getElementById('user-menu');
+            const userInitial = document.getElementById('user-initial');
+            const userName = document.getElementById('user-name');
+
+            authButtons.style.display = 'none';
+            userMenu.style.display = 'flex';
+            
+            if (currentUser) {
+                userInitial.textContent = currentUser.first_name ? currentUser.first_name[0].toUpperCase() : currentUser.email[0].toUpperCase();
+                userName.textContent = currentUser.first_name ? `${currentUser.first_name} ${currentUser.last_name}` : currentUser.email;
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userData');
+            currentUser = null;
+            authToken = null;
+            
+            const authButtons = document.getElementById('auth-buttons');
+            const userMenu = document.getElementById('user-menu');
+            
+            authButtons.style.display = 'block';
+            userMenu.style.display = 'none';
+        }
+
+        function openDashboard() {
+            alert('Dashboard feature coming soon! Your account is ready and authenticated.');
+        }
+
+        // Scanning functions
+        function scrollToScan() {
+            document.getElementById('scan-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function startScan() {
+            const url = document.getElementById('website-url').value.trim();
+            const maxPages = parseInt(document.getElementById('max-pages').value);
+            
+            if (!url) {
+                showError('Please enter a website URL');
+                return;
+            }
+
+            if (isScanning) return;
+            
+            isScanning = true;
+            hideError();
+            showProgress();
+            updateScanButton(true);
+            
+            try {
+                const progressSteps = [
+                    'Analyzing website structure...',
+                    'Crawling pages...',
+                    'Checking accessibility violations...',
+                    'Calculating lawsuit risk...',
+                    'Generating report...'
+                ];
+
+                let stepIndex = 0;
+                const progressInterval = setInterval(() => {
+                    if (stepIndex < progressSteps.length) {
+                        updateProgress(progressSteps[stepIndex], (stepIndex + 1) * 20);
+                        stepIndex++;
+                    }
+                }, 2000);
+
+                const backendUrl = 'https://web-production-51f3.up.railway.app';
+                
+                const response = await fetch(`${backendUrl}/api/scan/premium`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        max_pages: maxPages
+                    })
+                });
+
+                clearInterval(progressInterval);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                updateProgress('Scan complete!', 100);
+                displayResults(data);
+                
+                setTimeout(() => {
+                    document.getElementById('scan-results').scrollIntoView({ behavior: 'smooth' });
+                }, 500);
+                
+            } catch (err) {
+                showError(`Scan failed: ${err.message}`);
+                hideProgress();
+            } finally {
+                isScanning = false;
+                updateScanButton(false);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            errorText.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        function showProgress() {
+            document.getElementById('scan-progress').style.display = 'block';
+        }
+
+        function hideProgress() {
+            document.getElementById('scan-progress').style.display = 'none';
+        }
+
+        function updateProgress(status, percentage) {
+            document.getElementById('scan-status').textContent = status;
+            document.getElementById('progress-bar').style.width = percentage + '%';
+        }
+
+        function updateScanButton(scanning) {
+            const button = document.getElementById('scan-button');
+            if (scanning) {
+                button.innerHTML = '<div class="spinner"></div>Scanning...';
+                button.disabled = true;
+            } else {
+                button.innerHTML = '🔍 Start Enhanced Scan';
+                button.disabled = false;
+            }
+        }
+
+        function displayResults(data) {
+            const resultsSection = document.getElementById('scan-results');
+            const resultsTitle = document.getElementById('results-title');
+            const resultsDescription = document.getElementById('results-description');
+            const resultsContent = document.getElementById('results-content');
+
+            resultsTitle.textContent = `Scan Results for ${data.url}`;
+            resultsDescription.textContent = `Scanned ${data.pages_scanned} pages in ${data.scan_duration} seconds`;
+
+            let resultsHTML = '';
+
+            // Risk Alert
+            if (!data.lawsuit_risk?.clean_website) {
+                resultsHTML += `
+                    <div class="bg-red-50 border border-red-200 rounded-md p-6">
+                        <div class="flex">
+                            <svg class="h-6 w-6 text-red-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div>
+                                <h3 class="font-bold text-red-900 text-lg mb-2">
+                                    URGENT: Your website could face $${(data.lawsuit_risk?.max_settlement || 0).toLocaleString()} in lawsuit damages
+                                </h3>
+                                <p class="text-red-800">
+                                    Your accessibility violations could result in $${(data.lawsuit_risk?.min_settlement || 0).toLocaleString()} to $${(data.lawsuit_risk?.max_settlement || 0).toLocaleString()} in legal settlements and fees
+                                </p>
+                                <p class="text-red-800 mt-2">
+                                    <strong>Lawsuit Probability: ${data.lawsuit_risk?.probability || '0'}% (${data.lawsuit_risk?.risk_level || 'UNKNOWN'})</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Cost Breakdown
+            if (data.lawsuit_risk?.cost_breakdown) {
+                resultsHTML += `
+                    <div class="bg-orange-50 border border-orange-200 rounded-md p-6">
+                        <h3 class="text-lg font-bold text-orange-900 mb-4">Realistic Cost Breakdown</h3>
+                        <div class="space-y-2">
+                `;
+                
+                Object.entries(data.lawsuit_risk.cost_breakdown).forEach(([key, value]) => {
+                    resultsHTML += `
+                        <div class="flex justify-between">
+                            <span class="capitalize">${key.replace(/_/g, ' ')}:</span>
+                            <span class="font-semibold text-orange-800">
+                                $${typeof value === 'number' ? value.toLocaleString() : value}
+                            </span>
+                        </div>
+                    `;
+                });
+
+                resultsHTML += `
+                            <div class="border-t pt-2 mt-4">
+                                <div class="flex justify-between text-lg font-bold">
+                                    <span>Total potential cost exposure:</span>
+                                    <span class="text-orange-900">
+                                        $${(data.lawsuit_risk?.total_cost || 0).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Violations Summary
+            if (data.violations_by_severity) {
+                resultsHTML += `
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                `;
+                
+                Object.entries(data.violations_by_severity).forEach(([severity, count]) => {
+                    resultsHTML += `
+                        <div class="bg-white border rounded-lg p-6 text-center">
+                            <div class="text-3xl font-bold mb-2 text-gray-900">${count}</div>
+                            <div class="text-sm font-medium text-gray-600 capitalize">${severity}</div>
+                        </div>
+                    `;
+                });
+
+                resultsHTML += `</div>`;
+            }
+
+            // Compliance Score
+            resultsHTML += `
+                <div class="bg-white border rounded-lg p-6">
+                    <h3 class="text-lg font-bold mb-4">Compliance Score</h3>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-1 bg-gray-200 rounded-full h-4">
+                            <div class="bg-blue-600 h-4 rounded-full" style="width: ${data.compliance_score || 0}%"></div>
+                        </div>
+                        <span class="text-lg font-bold px-3 py-1 rounded ${(data.compliance_score || 0) >= 90 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${data.compliance_score || 0}%
+                        </span>
+                    </div>
+                </div>
+            `;
+
+            // Upgrade CTA
+            if (data.is_free_tier && !data.lawsuit_risk?.clean_website) {
+                resultsHTML += `
+                    <div class="bg-blue-50 border border-blue-200 rounded-md p-6 text-center">
+                        <svg class="h-12 w-12 text-blue-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                        <h3 class="text-xl font-bold text-blue-900 mb-2">
+                            Get Complete Violation Details & AI-Powered Fixes
+                        </h3>
+                        <p class="text-blue-700 mb-4">
+                            Upgrade to see detailed remediation guides, exact code snippets, and step-by-step implementation instructions.
+                        </p>
+                        <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium">
+                            Upgrade Now - Starting at $59/month
+                        </button>
+                    </div>
+                `;
+            }
+
+            resultsContent.innerHTML = resultsHTML;
+            resultsSection.style.display = 'block';
+        }
+    </script>
+</body>
 </html>
+
