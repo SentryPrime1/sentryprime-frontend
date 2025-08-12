@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert.jsx'
 import { Shield, Search, AlertTriangle, CheckCircle, DollarSign, Users, Star } from 'lucide-react'
 import AuthModal from './components/AuthModal.jsx'
 import UserMenu from './components/UserMenu.jsx'
-import Dashboard from './components/Dashboard.jsx'
+import Dashboard from './components/ui/Dashboard.jsx'
 import './App.css'
 
 function App() {
@@ -414,169 +414,180 @@ function App() {
                         {scanResults.lawsuit_risk.messaging.subheadline}
                       </div>
                       <div className="text-sm">
-                        Lawsuit Probability: {scanResults.lawsuit_risk.lawsuit_probability.percentage}% 
-                        ({scanResults.lawsuit_risk.lawsuit_probability.risk_level})
+                        Lawsuit Probability: {scanResults.lawsuit_risk.lawsuit_probability}% ({scanResults.lawsuit_risk.risk_level})
                       </div>
                     </AlertDescription>
                   </Alert>
                 )}
 
-                {/* Main Results Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Key Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-600">Total Violations</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold text-red-600">
-                        {scanResults.summary?.total_violations || 0}
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-red-600">
+                        {scanResults.violations?.serious || 0}
                       </div>
-                      <p className="text-sm text-gray-500">Issues found</p>
+                      <div className="text-sm text-gray-600">Serious Violations</div>
                     </CardContent>
                   </Card>
-
+                  
                   <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-600">Compliance Score</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold text-blue-600">
-                        {scanResults.summary?.compliance_score || 0}%
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {scanResults.violations?.moderate || 0}
                       </div>
-                      <p className="text-sm text-gray-500">WCAG 2.1 AA</p>
+                      <div className="text-sm text-gray-600">Moderate Violations</div>
                     </CardContent>
                   </Card>
-
+                  
                   <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-600">Lawsuit Exposure</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold text-orange-600">
-                        ${scanResults.lawsuit_risk?.total_exposure?.toLocaleString() || '0'}
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {scanResults.compliance_score || 0}%
                       </div>
-                      <p className="text-sm text-gray-500">Potential cost</p>
+                      <div className="text-sm text-gray-600">Compliance Score</div>
                     </CardContent>
                   </Card>
-
+                  
                   <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-600">Pages Scanned</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold text-green-600">
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-blue-600">
                         {scanResults.pages_scanned || 0}
                       </div>
-                      <p className="text-sm text-gray-500">Total analyzed</p>
+                      <div className="text-sm text-gray-600">Pages Scanned</div>
                     </CardContent>
                   </Card>
                 </div>
 
-                {/* Violation Breakdown */}
-                {scanResults.summary && (
-                  <Card>
+                {/* Lawsuit Risk Calculation */}
+                {scanResults.lawsuit_risk && !scanResults.lawsuit_risk.clean_website && (
+                  <Card className="border-red-200">
                     <CardHeader>
-                      <CardTitle>Violation Breakdown</CardTitle>
-                      <CardDescription>Issues categorized by severity level</CardDescription>
+                      <CardTitle className="text-red-800 flex items-center">
+                        <DollarSign className="mr-2 h-5 w-5" />
+                        Lawsuit Risk Assessment
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="text-center p-4 bg-red-50 rounded-lg">
-                          <div className="text-2xl font-bold text-red-600">
-                            {scanResults.summary.critical_violations || 0}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <h4 className="font-semibold mb-3">Financial Exposure</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span>Settlement Amount:</span>
+                              <span className="font-semibold">${scanResults.lawsuit_risk.settlement_amount?.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Legal Fees:</span>
+                              <span className="font-semibold">${scanResults.lawsuit_risk.legal_fees?.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Remediation Costs:</span>
+                              <span className="font-semibold">${scanResults.lawsuit_risk.remediation_cost?.toLocaleString()}</span>
+                            </div>
+                            <div className="border-t pt-2 flex justify-between text-lg font-bold text-red-600">
+                              <span>Total Exposure:</span>
+                              <span>${scanResults.lawsuit_risk.total_cost?.toLocaleString()}</span>
+                            </div>
                           </div>
-                          <div className="text-sm text-red-700">Critical</div>
                         </div>
-                        <div className="text-center p-4 bg-orange-50 rounded-lg">
-                          <div className="text-2xl font-bold text-orange-600">
-                            {scanResults.summary.serious_violations || 0}
+                        
+                        <div>
+                          <h4 className="font-semibold mb-3">Risk Factors</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span>Lawsuit Probability:</span>
+                              <Badge variant={scanResults.lawsuit_risk.lawsuit_probability > 70 ? 'destructive' : 'secondary'}>
+                                {scanResults.lawsuit_risk.lawsuit_probability}%
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Risk Level:</span>
+                              <Badge variant={scanResults.lawsuit_risk.risk_level === 'EXTREME' ? 'destructive' : 'secondary'}>
+                                {scanResults.lawsuit_risk.risk_level}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Compliance Score:</span>
+                              <Badge variant={scanResults.compliance_score < 50 ? 'destructive' : 'secondary'}>
+                                {scanResults.compliance_score}%
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="text-sm text-orange-700">Serious</div>
-                        </div>
-                        <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                          <div className="text-2xl font-bold text-yellow-600">
-                            {scanResults.summary.moderate_violations || 0}
-                          </div>
-                          <div className="text-sm text-yellow-700">Moderate</div>
-                        </div>
-                        <div className="text-center p-4 bg-blue-50 rounded-lg">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {scanResults.summary.minor_violations || 0}
-                          </div>
-                          <div className="text-sm text-blue-700">Minor</div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 )}
 
-                {/* Business Impact */}
-                {scanResults.business_impact && (
+                {/* Violation Details */}
+                {scanResults.violations && (scanResults.violations.serious > 0 || scanResults.violations.moderate > 0) && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Business Impact Analysis</CardTitle>
-                      <CardDescription>Financial and operational implications</CardDescription>
+                      <CardTitle className="flex items-center">
+                        <AlertTriangle className="mr-2 h-5 w-5 text-orange-600" />
+                        Accessibility Violations Found
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-gray-900">
-                            ${scanResults.business_impact.settlement_cost?.toLocaleString() || '0'}
+                    <CardContent>
+                      <div className="space-y-4">
+                        {scanResults.violations.serious > 0 && (
+                          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-red-800">Serious Violations</h4>
+                              <Badge variant="destructive">{scanResults.violations.serious}</Badge>
+                            </div>
+                            <p className="text-sm text-red-700">
+                              These violations significantly impact accessibility and pose high lawsuit risk. 
+                              Immediate remediation recommended.
+                            </p>
                           </div>
-                          <div className="text-sm text-gray-600">Avg. Settlement</div>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-gray-900">
-                            ${scanResults.business_impact.legal_fees?.toLocaleString() || '0'}
+                        )}
+                        
+                        {scanResults.violations.moderate > 0 && (
+                          <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-orange-800">Moderate Violations</h4>
+                              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                                {scanResults.violations.moderate}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-orange-700">
+                              These violations affect user experience and should be addressed to improve compliance.
+                            </p>
                           </div>
-                          <div className="text-sm text-gray-600">Legal Fees</div>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-gray-900">
-                            ${scanResults.business_impact.remediation_cost?.toLocaleString() || '0'}
-                          </div>
-                          <div className="text-sm text-gray-600">Remediation</div>
-                        </div>
+                        )}
                       </div>
-                      
-                      {scanResults.business_impact.recommendations && (
-                        <div>
-                          <h4 className="font-semibold mb-2">Recommendations:</h4>
-                          <ul className="space-y-1 text-sm">
-                            {scanResults.business_impact.recommendations.map((rec, index) => (
-                              <li key={index} className="flex items-start">
-                                <CheckCircle className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                                {rec}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
                     </CardContent>
                   </Card>
                 )}
 
                 {/* Call to Action */}
-                <Card className="border-blue-200 bg-blue-50">
-                  <CardContent className="p-6">
-                    <div className="text-center">
+                {scanResults.lawsuit_risk && !scanResults.lawsuit_risk.clean_website && (
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-6 text-center">
+                      <Shield className="h-12 w-12 text-blue-600 mx-auto mb-4" />
                       <h3 className="text-xl font-bold text-blue-900 mb-2">
-                        Get Professional Remediation Help
+                        Protect Your Business Today
                       </h3>
                       <p className="text-blue-700 mb-4">
-                        Our accessibility experts can help you fix these issues and prevent future lawsuits.
+                        Don't wait for a lawsuit. Get detailed remediation guidance and ongoing monitoring 
+                        to keep your website compliant and protected.
                       </p>
-                      <div className="flex justify-center space-x-4">
-                        <Button className="bg-blue-600 hover:bg-blue-700">
-                          Get Expert Help - $149/month
+                      <div className="space-y-2">
+                        <Button size="lg" className="bg-blue-600 hover:bg-blue-700 mr-4">
+                          Get Detailed Report - $149
                         </Button>
-                        <Button variant="outline" className="border-blue-300 text-blue-700">
-                          Download Full Report
+                        <Button variant="outline" size="lg">
+                          Schedule Consultation
                         </Button>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <p className="text-xs text-blue-600 mt-2">
+                        Includes step-by-step remediation guide • 30-day money-back guarantee
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -585,7 +596,7 @@ function App() {
 
       {/* Authentication Modal */}
       {showAuthModal && (
-        <AuthModal 
+        <AuthModal
           onClose={() => setShowAuthModal(false)}
           onAuthSuccess={handleAuthSuccess}
         />
