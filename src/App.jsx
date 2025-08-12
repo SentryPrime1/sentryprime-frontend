@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
@@ -6,9 +6,13 @@ import { Badge } from '@/components/ui/badge.jsx'
 import { Progress } from '@/components/ui/progress.jsx'
 import { Alert, AlertDescription } from '@/components/ui/alert.jsx'
 import { Shield, Search, AlertTriangle, CheckCircle, DollarSign, Users, Star } from 'lucide-react'
+import AuthModal from './components/AuthModal.jsx'
+import UserMenu from './components/UserMenu.jsx'
+import Dashboard from './components/Dashboard.jsx'
 import './App.css'
 
 function App() {
+  // Existing scan state
   const [url, setUrl] = useState('')
   const [maxPages, setMaxPages] = useState(50)
   const [isScanning, setIsScanning] = useState(false)
@@ -16,6 +20,29 @@ function App() {
   const [scanStatus, setScanStatus] = useState('')
   const [scanResults, setScanResults] = useState(null)
   const [error, setError] = useState('')
+
+  // Authentication state
+  const [user, setUser] = useState(null)
+  const [authToken, setAuthToken] = useState(null)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(false)
+
+  // Check for existing authentication on app load
+  useEffect(() => {
+    const token = localStorage.getItem('authToken')
+    const userData = localStorage.getItem('userData')
+    
+    if (token && userData) {
+      try {
+        setAuthToken(token)
+        setUser(JSON.parse(userData))
+      } catch (error) {
+        // Clear invalid data
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('userData')
+      }
+    }
+  }, [])
 
   const handleScan = async () => {
     if (!url.trim()) {
@@ -48,11 +75,15 @@ function App() {
         }
       }, 2000)
 
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://web-production-51f3.up.railway.app'}/api/scan?url=${encodeURIComponent(url.trim())}&max_pages=${maxPages}`, {
-        method: 'GET',
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://web-production-51f3.up.railway.app'}/api/scan/premium`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          url: url.trim(),
+          max_pages: maxPages
+        })
       })
 
       clearInterval(progressInterval)
@@ -83,6 +114,35 @@ function App() {
     }
   }
 
+  // Authentication handlers
+  const handleAuthSuccess = (userData, token) => {
+    setUser(userData)
+    setAuthToken(token)
+    setShowAuthModal(false)
+  }
+
+  const handleLogout = () => {
+    setUser(null)
+    setAuthToken(null)
+    setShowDashboard(false)
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('userData')
+  }
+
+  const handleOpenDashboard = () => {
+    setShowDashboard(true)
+  }
+
+  // If dashboard is open, show dashboard component
+  if (showDashboard && user) {
+    return (
+      <Dashboard 
+        user={user} 
+        onClose={() => setShowDashboard(false)} 
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -103,8 +163,23 @@ function App() {
               <Badge variant="secondary" className="bg-purple-100 text-purple-800">
                 Reviews
               </Badge>
-              <Button variant="outline">Sign In</Button>
-              <Button>Get Started</Button>
+              
+              {user ? (
+                <UserMenu 
+                  user={user} 
+                  onLogout={handleLogout}
+                  onOpenDashboard={handleOpenDashboard}
+                />
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => setShowAuthModal(true)}>
+                    Sign In
+                  </Button>
+                  <Button onClick={() => setShowAuthModal(true)}>
+                    Get Started
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -346,150 +421,177 @@ function App() {
                   </Alert>
                 )}
 
-                {/* Settlement Breakdown */}
-                {scanResults.lawsuit_risk?.settlement_breakdown && (
-                  <Card className="border-orange-200 bg-orange-50">
-                    <CardHeader>
-                      <CardTitle className="text-lg text-orange-800">
-                        Realistic Cost Breakdown
-                      </CardTitle>
+                {/* Main Results Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-600">Total Violations</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-700">
-                            {scanResults.lawsuit_risk.settlement_breakdown.settlement_amount.description}:
-                          </span>
-                          <span className="font-semibold text-orange-800">
-                            {scanResults.lawsuit_risk.settlement_breakdown.settlement_amount.formatted}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-700">
-                            {scanResults.lawsuit_risk.settlement_breakdown.attorney_fees.description}:
-                          </span>
-                          <span className="font-semibold text-orange-800">
-                            {scanResults.lawsuit_risk.settlement_breakdown.attorney_fees.formatted}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-700">
-                            {scanResults.lawsuit_risk.settlement_breakdown.compliance_costs.description}:
-                          </span>
-                          <span className="font-semibold text-orange-800">
-                            {scanResults.lawsuit_risk.settlement_breakdown.compliance_costs.formatted}
-                          </span>
-                        </div>
-                        <hr className="border-orange-200" />
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold text-gray-800">
-                            {scanResults.lawsuit_risk.settlement_breakdown.total_exposure.description}:
-                          </span>
-                          <span className="font-bold text-lg text-orange-900">
-                            {scanResults.lawsuit_risk.settlement_breakdown.total_exposure.formatted}
-                          </span>
-                        </div>
+                      <div className="text-3xl font-bold text-red-600">
+                        {scanResults.summary?.total_violations || 0}
                       </div>
+                      <p className="text-sm text-gray-500">Issues found</p>
                     </CardContent>
                   </Card>
-                )}
 
-                {/* Violations Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Card>
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-red-600">
-                        {scanResults.violations_by_severity?.critical || 0}
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-600">Compliance Score</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-blue-600">
+                        {scanResults.summary?.compliance_score || 0}%
                       </div>
-                      <div className="text-sm text-gray-600">Critical</div>
+                      <p className="text-sm text-gray-500">WCAG 2.1 AA</p>
                     </CardContent>
                   </Card>
+
                   <Card>
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {scanResults.violations_by_severity?.serious || 0}
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-600">Lawsuit Exposure</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-orange-600">
+                        ${scanResults.lawsuit_risk?.total_exposure?.toLocaleString() || '0'}
                       </div>
-                      <div className="text-sm text-gray-600">Serious</div>
+                      <p className="text-sm text-gray-500">Potential cost</p>
                     </CardContent>
                   </Card>
+
                   <Card>
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-yellow-600">
-                        {scanResults.violations_by_severity?.moderate || 0}
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-600">Pages Scanned</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-green-600">
+                        {scanResults.pages_scanned || 0}
                       </div>
-                      <div className="text-sm text-gray-600">Moderate</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {scanResults.violations_by_severity?.minor || 0}
-                      </div>
-                      <div className="text-sm text-gray-600">Minor</div>
+                      <p className="text-sm text-gray-500">Total analyzed</p>
                     </CardContent>
                   </Card>
                 </div>
 
-                {/* Compliance Score */}
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">Compliance Score</h3>
-                      <Badge variant={scanResults.compliance_score >= 80 ? "default" : "destructive"}>
-                        {scanResults.compliance_score}%
-                      </Badge>
-                    </div>
-                    <Progress value={scanResults.compliance_score} className="w-full" />
-                  </CardContent>
-                </Card>
-
-                {/* Upgrade Prompt */}
-                {scanResults.is_free_tier && !scanResults.lawsuit_risk?.clean_website && (
-                  <Card className="border-blue-200 bg-blue-50">
-                    <CardContent className="p-6">
-                      <div className="text-center">
-                        <DollarSign className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                        <h3 className="text-xl font-bold text-blue-900 mb-2">
-                          Get Complete Violation Details & AI-Powered Fixes
-                        </h3>
-                        <p className="text-blue-700 mb-4">
-                          Upgrade to see detailed remediation guides, exact code snippets, and step-by-step implementation instructions.
-                        </p>
-                        <Button className="bg-blue-600 hover:bg-blue-700">
-                          Upgrade Now - Starting at $59/month
-                        </Button>
+                {/* Violation Breakdown */}
+                {scanResults.summary && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Violation Breakdown</CardTitle>
+                      <CardDescription>Issues categorized by severity level</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center p-4 bg-red-50 rounded-lg">
+                          <div className="text-2xl font-bold text-red-600">
+                            {scanResults.summary.critical_violations || 0}
+                          </div>
+                          <div className="text-sm text-red-700">Critical</div>
+                        </div>
+                        <div className="text-center p-4 bg-orange-50 rounded-lg">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {scanResults.summary.serious_violations || 0}
+                          </div>
+                          <div className="text-sm text-orange-700">Serious</div>
+                        </div>
+                        <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                          <div className="text-2xl font-bold text-yellow-600">
+                            {scanResults.summary.moderate_violations || 0}
+                          </div>
+                          <div className="text-sm text-yellow-700">Moderate</div>
+                        </div>
+                        <div className="text-center p-4 bg-blue-50 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {scanResults.summary.minor_violations || 0}
+                          </div>
+                          <div className="text-sm text-blue-700">Minor</div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Business Impact */}
+                {scanResults.business_impact && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Business Impact Analysis</CardTitle>
+                      <CardDescription>Financial and operational implications</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="text-center p-4 bg-gray-50 rounded-lg">
+                          <div className="text-xl font-bold text-gray-900">
+                            ${scanResults.business_impact.settlement_cost?.toLocaleString() || '0'}
+                          </div>
+                          <div className="text-sm text-gray-600">Avg. Settlement</div>
+                        </div>
+                        <div className="text-center p-4 bg-gray-50 rounded-lg">
+                          <div className="text-xl font-bold text-gray-900">
+                            ${scanResults.business_impact.legal_fees?.toLocaleString() || '0'}
+                          </div>
+                          <div className="text-sm text-gray-600">Legal Fees</div>
+                        </div>
+                        <div className="text-center p-4 bg-gray-50 rounded-lg">
+                          <div className="text-xl font-bold text-gray-900">
+                            ${scanResults.business_impact.remediation_cost?.toLocaleString() || '0'}
+                          </div>
+                          <div className="text-sm text-gray-600">Remediation</div>
+                        </div>
+                      </div>
+                      
+                      {scanResults.business_impact.recommendations && (
+                        <div>
+                          <h4 className="font-semibold mb-2">Recommendations:</h4>
+                          <ul className="space-y-1 text-sm">
+                            {scanResults.business_impact.recommendations.map((rec, index) => (
+                              <li key={index} className="flex items-start">
+                                <CheckCircle className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                                {rec}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Call to Action */}
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <h3 className="text-xl font-bold text-blue-900 mb-2">
+                        Get Professional Remediation Help
+                      </h3>
+                      <p className="text-blue-700 mb-4">
+                        Our accessibility experts can help you fix these issues and prevent future lawsuits.
+                      </p>
+                      <div className="flex justify-center space-x-4">
+                        <Button className="bg-blue-600 hover:bg-blue-700">
+                          Get Expert Help - $149/month
+                        </Button>
+                        <Button variant="outline" className="border-blue-300 text-blue-700">
+                          Download Full Report
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </CardContent>
             </Card>
           </div>
         </section>
       )}
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Shield className="h-8 w-8 text-blue-400" />
-            <span className="text-2xl font-bold">SentryPrime</span>
-          </div>
-          <p className="text-gray-400 mb-4">
-            Protecting businesses from accessibility lawsuits since 2025
-          </p>
-          <div className="flex justify-center items-center space-x-8 text-sm">
-            <span>WCAG 2.1 Compliant</span>
-            <span>•</span>
-            <span>Trusted by 1000+ businesses</span>
-            <span>•</span>
-            <span>Made with ❤️ by Manus</span>
-          </div>
-        </div>
-      </footer>
+      {/* Authentication Modal */}
+      {showAuthModal && (
+        <AuthModal 
+          onClose={() => setShowAuthModal(false)}
+          onAuthSuccess={handleAuthSuccess}
+        />
+      )}
     </div>
   )
 }
 
 export default App
-
