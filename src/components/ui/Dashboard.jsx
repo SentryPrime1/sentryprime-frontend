@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Progress } from '@/components/ui/progress.jsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx'
+import { Input } from '@/components/ui/input.jsx'
+import { Alert, AlertDescription } from '@/components/ui/alert.jsx'
 import { 
   User, 
   Globe, 
@@ -17,79 +19,139 @@ import {
   Plus,
   Search,
   Eye,
-  X
+  X,
+  Loader2,
+  RefreshCw
 } from 'lucide-react'
 
 const Dashboard = ({ user, onClose }) => {
   const [activeTab, setActiveTab] = useState('overview')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  
+  // State for dashboard data
+  const [dashboardStats, setDashboardStats] = useState(null)
+  const [websites, setWebsites] = useState([])
+  const [scans, setScans] = useState([])
+  
+  // State for forms
+  const [newWebsiteUrl, setNewWebsiteUrl] = useState('')
+  const [newWebsiteName, setNewWebsiteName] = useState('')
+  const [addingWebsite, setAddingWebsite] = useState(false)
+  const [scanningWebsite, setScanningWebsite] = useState(null)
 
-  // Mock data for demonstration
-  const mockStats = {
-    totalWebsites: 3,
-    averageCompliance: 78,
-    totalViolations: 42,
-    scansThisMonth: 15
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('authToken')
   }
 
-  const mockWebsites = [
-    {
-      id: 1,
-      url: 'https://example.com',
-      name: 'Main Website',
-      compliance: 85,
-      status: 'good',
-      lastScan: '2 hours ago',
-      violations: { critical: 0, serious: 2, moderate: 5, minor: 8 }
-    },
-    {
-      id: 2,
-      url: 'https://shop.example.com',
-      name: 'E-commerce Store',
-      compliance: 72,
-      status: 'warning',
-      lastScan: '1 day ago',
-      violations: { critical: 1, serious: 4, moderate: 8, minor: 12 }
-    },
-    {
-      id: 3,
-      url: 'https://blog.example.com',
-      name: 'Company Blog',
-      compliance: 91,
-      status: 'good',
-      lastScan: '3 hours ago',
-      violations: { critical: 0, serious: 1, moderate: 2, minor: 3 }
-    }
-  ]
+  // API call helper
+  const apiCall = async (endpoint, options = {}) => {
+    const token = getAuthToken()
+    const baseUrl = process.env.REACT_APP_BACKEND_URL || 'https://web-production-51f3.up.railway.app'
+    
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers
+      },
+      ...options
+    })
 
-  const mockScans = [
-    {
-      id: 1,
-      website: 'https://example.com',
-      date: '2025-08-11',
-      time: '14:30',
-      compliance: 85,
-      violations: 15,
-      status: 'completed'
-    },
-    {
-      id: 2,
-      website: 'https://shop.example.com',
-      date: '2025-08-10',
-      time: '09:15',
-      compliance: 72,
-      violations: 25,
-      status: 'completed'
-    },
-    {
-      id: 3,
-      website: 'https://blog.example.com',
-      date: '2025-08-11',
-      time: '11:45',
-      compliance: 91,
-      violations: 6,
-      status: 'completed'
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `HTTP ${response.status}`)
     }
-  ]
+
+    return response.json()
+  }
+
+  // Load dashboard data
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+      setError('')
+
+      // Load all dashboard data in parallel
+      const [statsData, websitesData, scansData] = await Promise.all([
+        apiCall('/api/dashboard/stats'),
+        apiCall('/api/dashboard/websites'),
+        apiCall('/api/dashboard/scans')
+      ])
+
+      setDashboardStats(statsData)
+      setWebsites(websitesData.websites || [])
+      setScans(scansData.scans || [])
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err)
+      setError(`Failed to load dashboard data: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Add new website
+  const addWebsite = async () => {
+    if (!newWebsiteUrl.trim()) {
+      setError('Please enter a website URL')
+      return
+    }
+
+    try {
+      setAddingWebsite(true)
+      setError('')
+
+      await apiCall('/api/dashboard/websites', {
+        method: 'POST',
+        body: JSON.stringify({
+          url: newWebsiteUrl.trim(),
+          name: newWebsiteName.trim() || undefined
+        })
+      })
+
+      // Clear form
+      setNewWebsiteUrl('')
+      setNewWebsiteName('')
+      
+      // Reload data
+      await loadDashboardData()
+    } catch (err) {
+      console.error('Failed to add website:', err)
+      setError(`Failed to add website: ${err.message}`)
+    } finally {
+      setAddingWebsite(false)
+    }
+  }
+
+  // Trigger scan for website
+  const triggerScan = async (websiteId, url) => {
+    try {
+      setScanningWebsite(websiteId)
+      setError('')
+
+      await apiCall('/api/dashboard/scan', {
+        method: 'POST',
+        body: JSON.stringify({
+          website_id: websiteId,
+          url: url
+        })
+      })
+
+      // Reload data to show new scan
+      await loadDashboardData()
+    } catch (err) {
+      console.error('Failed to trigger scan:', err)
+      setError(`Failed to trigger scan: ${err.message}`)
+    } finally {
+      setScanningWebsite(null)
+    }
+  }
+
+  // Load data on component mount
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -104,6 +166,37 @@ const Dashboard = ({ user, onClose }) => {
     if (score >= 90) return 'text-green-600'
     if (score >= 70) return 'text-yellow-600'
     return 'text-red-600'
+  }
+
+  const getRiskLevelColor = (riskLevel) => {
+    switch (riskLevel?.toLowerCase()) {
+      case 'minimal':
+      case 'low': return 'text-green-600 bg-green-100'
+      case 'moderate': return 'text-yellow-600 bg-yellow-100'
+      case 'high':
+      case 'extreme': return 'text-red-600 bg-red-100'
+      default: return 'text-gray-600 bg-gray-100'
+    }
+  }
+
+  const formatDate = (dateString) => {
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    } catch {
+      return dateString
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -126,9 +219,13 @@ const Dashboard = ({ user, onClose }) => {
                   <User className="h-4 w-4 text-blue-600" />
                 </div>
                 <span className="text-sm font-medium text-gray-700">
-                  Welcome, {user?.firstName || 'User'}!
+                  Welcome, {user?.first_name || user?.firstName || 'User'}!
                 </span>
               </div>
+              <Button variant="outline" size="sm" onClick={() => loadDashboardData()}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
               <Button variant="outline" size="sm" onClick={onClose}>
                 <X className="h-4 w-4 mr-2" />
                 Back to Scan
@@ -140,6 +237,13 @@ const Dashboard = ({ user, onClose }) => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview" className="flex items-center space-x-2">
@@ -173,7 +277,7 @@ const Dashboard = ({ user, onClose }) => {
                   <Globe className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{mockStats.totalWebsites}</div>
+                  <div className="text-2xl font-bold">{dashboardStats?.overview?.total_websites || 0}</div>
                   <p className="text-xs text-muted-foreground">Active monitoring</p>
                 </CardContent>
               </Card>
@@ -184,8 +288,8 @@ const Dashboard = ({ user, onClose }) => {
                   <CheckCircle className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-2xl font-bold ${getComplianceColor(mockStats.averageCompliance)}`}>
-                    {mockStats.averageCompliance}%
+                  <div className={`text-2xl font-bold ${getComplianceColor(dashboardStats?.overview?.avg_compliance_score || 0)}`}>
+                    {dashboardStats?.overview?.avg_compliance_score || 0}%
                   </div>
                   <p className="text-xs text-muted-foreground">Across all sites</p>
                 </CardContent>
@@ -197,19 +301,21 @@ const Dashboard = ({ user, onClose }) => {
                   <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{mockStats.totalViolations}</div>
+                  <div className="text-2xl font-bold text-red-600">{dashboardStats?.overview?.total_violations || 0}</div>
                   <p className="text-xs text-muted-foreground">Need attention</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Scans This Month</CardTitle>
+                  <CardTitle className="text-sm font-medium">Total Scans</CardTitle>
                   <Clock className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{mockStats.scansThisMonth}</div>
-                  <p className="text-xs text-muted-foreground">+3 from last month</p>
+                  <div className="text-2xl font-bold">{dashboardStats?.overview?.total_scans || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {dashboardStats?.quick_stats?.scans_this_month || 0} this month
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -222,35 +328,59 @@ const Dashboard = ({ user, onClose }) => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {mockScans.slice(0, 3).map((scan) => (
-                      <div key={scan.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-sm">{scan.website}</p>
-                          <p className="text-xs text-gray-500">{scan.date} at {scan.time}</p>
+                    {dashboardStats?.recent_activity?.length > 0 ? (
+                      dashboardStats.recent_activity.slice(0, 5).map((activity) => (
+                        <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div>
+                            <p className="font-medium text-sm">{activity.website_name}</p>
+                            <p className="text-xs text-gray-500">{formatDate(activity.scan_date)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-medium text-sm ${getComplianceColor(activity.compliance_score)}`}>
+                              {activity.compliance_score}% compliant
+                            </p>
+                            <p className="text-xs text-gray-500">{activity.violations} violations</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className={`font-medium text-sm ${getComplianceColor(scan.compliance)}`}>
-                            {scan.compliance}% compliant
-                          </p>
-                          <p className="text-xs text-gray-500">{scan.violations} violations</p>
-                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Search className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                        <p>No recent scans</p>
+                        <p className="text-sm">Add a website and run your first scan</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Compliance Trends</CardTitle>
-                  <CardDescription>Track your accessibility improvements over time</CardDescription>
+                  <CardTitle>Quick Stats</CardTitle>
+                  <CardDescription>Key metrics for your account</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="text-center py-8 text-gray-500">
-                      <BarChart3 className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                      <p>Compliance trend chart</p>
-                      <p className="text-sm">Coming soon with data visualization</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Websites Monitored</span>
+                      <span className="font-medium">{dashboardStats?.quick_stats?.websites_monitored || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Scans This Month</span>
+                      <span className="font-medium">{dashboardStats?.quick_stats?.scans_this_month || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Avg Pages Per Scan</span>
+                      <span className="font-medium">{dashboardStats?.quick_stats?.avg_pages_per_scan || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Last Scan</span>
+                      <span className="font-medium text-sm">
+                        {dashboardStats?.quick_stats?.last_scan_date 
+                          ? formatDate(dashboardStats.quick_stats.last_scan_date)
+                          : 'Never'
+                        }
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -265,69 +395,109 @@ const Dashboard = ({ user, onClose }) => {
                 <h2 className="text-2xl font-bold text-gray-900">Your Websites</h2>
                 <p className="text-gray-600">Manage and monitor your website accessibility</p>
               </div>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Website
-              </Button>
             </div>
 
+            {/* Add Website Form */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Add New Website</CardTitle>
+                <CardDescription>Start monitoring a new website for accessibility compliance</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input
+                    placeholder="https://example.com"
+                    value={newWebsiteUrl}
+                    onChange={(e) => setNewWebsiteUrl(e.target.value)}
+                    disabled={addingWebsite}
+                  />
+                  <Input
+                    placeholder="Website Name (optional)"
+                    value={newWebsiteName}
+                    onChange={(e) => setNewWebsiteName(e.target.value)}
+                    disabled={addingWebsite}
+                  />
+                  <Button onClick={addWebsite} disabled={addingWebsite}>
+                    {addingWebsite ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4 mr-2" />
+                    )}
+                    Add Website
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Websites Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockWebsites.map((website) => (
-                <Card key={website.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{website.name}</CardTitle>
-                      <Badge className={getStatusColor(website.status)}>
-                        {website.status}
-                      </Badge>
-                    </div>
-                    <CardDescription>{website.url}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Compliance Score</span>
-                        <span className={`text-sm font-bold ${getComplianceColor(website.compliance)}`}>
-                          {website.compliance}%
-                        </span>
+              {websites.length > 0 ? (
+                websites.map((website) => (
+                  <Card key={website.id}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{website.name}</CardTitle>
+                        <Badge className={getRiskLevelColor(website.risk_level)}>
+                          {website.risk_level || 'Unknown'}
+                        </Badge>
                       </div>
-                      <Progress value={website.compliance} className="h-2" />
-                    </div>
+                      <CardDescription>{website.url}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-medium">Compliance Score</span>
+                          <span className={`text-sm font-bold ${getComplianceColor(website.compliance_score || 0)}`}>
+                            {website.compliance_score || 0}%
+                          </span>
+                        </div>
+                        <Progress value={website.compliance_score || 0} className="h-2" />
+                      </div>
 
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-500">Critical</p>
-                        <p className="font-medium text-red-600">{website.violations.critical}</p>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">Total Scans</p>
+                          <p className="font-medium">{website.total_scans || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Violations</p>
+                          <p className="font-medium text-red-600">{website.total_violations || 0}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-gray-500">Serious</p>
-                        <p className="font-medium text-orange-600">{website.violations.serious}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Moderate</p>
-                        <p className="font-medium text-yellow-600">{website.violations.moderate}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Minor</p>
-                        <p className="font-medium text-blue-600">{website.violations.minor}</p>
-                      </div>
-                    </div>
 
-                    <div className="flex space-x-2">
-                      <Button size="sm" className="flex-1">
-                        <Search className="h-4 w-4 mr-1" />
-                        Scan Now
-                      </Button>
-                      <Button size="sm" variant="outline" className="flex-1">
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Report
-                      </Button>
-                    </div>
+                      <div className="flex space-x-2">
+                        <Button 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => triggerScan(website.id, website.url)}
+                          disabled={scanningWebsite === website.id}
+                        >
+                          {scanningWebsite === website.id ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <Search className="h-4 w-4 mr-1" />
+                          )}
+                          Scan Now
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1">
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Report
+                        </Button>
+                      </div>
 
-                    <p className="text-xs text-gray-500">Last scan: {website.lastScan}</p>
-                  </CardContent>
-                </Card>
-              ))}
+                      <p className="text-xs text-gray-500">
+                        Last scan: {website.last_scan_date ? formatDate(website.last_scan_date) : 'Never'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-12">
+                  <Globe className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No websites yet</h3>
+                  <p className="text-gray-600 mb-4">Add your first website to start monitoring accessibility compliance</p>
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -338,282 +508,120 @@ const Dashboard = ({ user, onClose }) => {
                 <h2 className="text-2xl font-bold text-gray-900">Scan History</h2>
                 <p className="text-gray-600">View all your accessibility scan results</p>
               </div>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Run New Scan
-              </Button>
             </div>
 
             <Card>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Website
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Date & Time
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Compliance
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Violations
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {mockScans.map((scan) => (
-                        <tr key={scan.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {scan.website}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {scan.date} {scan.time}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`text-sm font-medium ${getComplianceColor(scan.compliance)}`}>
-                              {scan.compliance}%
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {scan.violations}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge className="bg-green-100 text-green-800">
-                              {scan.status}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <Button size="sm" variant="outline">
-                              <Eye className="h-4 w-4 mr-1" />
-                              View Report
-                            </Button>
-                          </td>
+                {scans.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Website
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date & Time
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Compliance
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Violations
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Risk Level
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {scans.map((scan) => (
+                          <tr key={scan.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{scan.website_name}</div>
+                                <div className="text-sm text-gray-500">{scan.url}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDate(scan.scan_date)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`text-sm font-medium ${getComplianceColor(scan.compliance_score)}`}>
+                                {scan.compliance_score}%
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{scan.total_violations} total</div>
+                              <div className="text-xs text-gray-500">
+                                {scan.serious_violations} serious, {scan.moderate_violations} moderate
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Badge className={getRiskLevelColor(scan.risk_level)}>
+                                {scan.risk_level}
+                              </Badge>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <Button size="sm" variant="outline">
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Search className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No scans yet</h3>
+                    <p className="text-gray-600 mb-4">Run your first accessibility scan to see results here</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Reports Tab */}
           <TabsContent value="reports" className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Reports & Analytics</h2>
-              <p className="text-gray-600">Generate detailed accessibility reports</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Executive Summary</CardTitle>
-                  <CardDescription>High-level compliance overview for stakeholders</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button className="w-full">
-                    <Download className="h-4 w-4 mr-2" />
-                    Generate Executive Report
-                  </Button>
-                  <p className="text-sm text-gray-500">
-                    Includes compliance scores, risk assessment, and recommendations
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Technical Report</CardTitle>
-                  <CardDescription>Detailed violation breakdown for developers</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button className="w-full" variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Generate Technical Report
-                  </Button>
-                  <p className="text-sm text-gray-500">
-                    Includes code examples, WCAG references, and fix instructions
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Trend Analysis</CardTitle>
-                  <CardDescription>Track compliance improvements over time</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button className="w-full" variant="outline">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    View Trends
-                  </Button>
-                  <p className="text-sm text-gray-500">
-                    Monthly compliance trends and violation patterns
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Custom Reports</CardTitle>
-                  <CardDescription>Create reports tailored to your needs</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button className="w-full" variant="outline">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Create Custom Report
-                  </Button>
-                  <p className="text-sm text-gray-500">
-                    Choose specific websites, date ranges, and violation types
-                  </p>
-                </CardContent>
-              </Card>
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Reports Coming Soon</h3>
+              <p className="text-gray-600">Detailed compliance reports and remediation guides will be available here</p>
             </div>
           </TabsContent>
 
           {/* Settings Tab */}
           <TabsContent value="settings" className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
-              <p className="text-gray-600">Manage your profile and preferences</p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Profile Information</CardTitle>
-                  <CardDescription>Update your personal details</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        First Name
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue={user?.firstName || ''}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Last Name
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue={user?.lastName || ''}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      defaultValue={user?.email || ''}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <Button>Update Profile</Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Subscription</CardTitle>
-                  <CardDescription>Manage your SentryPrime plan</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <h4 className="font-medium text-blue-900">Pro Plan</h4>
-                    <p className="text-sm text-blue-700">$149/month</p>
-                    <p className="text-xs text-blue-600 mt-1">
-                      5 websites, weekly scans, AI reports
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Button variant="outline" className="w-full">
-                      Upgrade Plan
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      Billing History
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notifications</CardTitle>
-                  <CardDescription>Configure your alert preferences</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Email notifications</span>
-                      <input type="checkbox" defaultChecked className="rounded" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Scan completion alerts</span>
-                      <input type="checkbox" defaultChecked className="rounded" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Weekly compliance reports</span>
-                      <input type="checkbox" className="rounded" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Critical violation alerts</span>
-                      <input type="checkbox" defaultChecked className="rounded" />
-                    </div>
-                  </div>
-                  <Button>Save Preferences</Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>API Access</CardTitle>
-                  <CardDescription>Integrate SentryPrime with your tools</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      API Key
-                    </label>
-                    <div className="flex space-x-2">
-                      <input
-                        type="password"
-                        value="sk-1234567890abcdef"
-                        readOnly
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                      />
-                      <Button variant="outline">Copy</Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Button variant="outline" className="w-full">
-                      Generate New Key
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      View Documentation
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Settings</CardTitle>
+                <CardDescription>Manage your account preferences</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <p className="text-sm text-gray-600">{user?.email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Name</label>
+                  <p className="text-sm text-gray-600">
+                    {user?.first_name} {user?.last_name}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Member Since</label>
+                  <p className="text-sm text-gray-600">
+                    {user?.created_at ? formatDate(user.created_at) : 'Unknown'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
